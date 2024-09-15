@@ -3,8 +3,8 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import NoSuchElementException
 import json
-
 import requests
 import os
 
@@ -19,6 +19,13 @@ def download_image(url, save_as):
     response = requests.get(url)
     with open(os.path.join('public', save_as), 'wb') as file:
         file.write(response.content)
+
+def get_role_name(star):
+    try:
+        role_name = star.find_element(By.CLASS_NAME, 'title-cast-item__characters-list').find_element(By.TAG_NAME, 'span').text
+    except NoSuchElementException:
+        role_name = ""
+    return role_name
 
 driver = webdriver.Chrome()
 driver.set_window_size(1920, 1080)
@@ -35,7 +42,7 @@ films_links = []
 
 for film in all_films:
     title = film.find_element(By.CLASS_NAME, "ipc-title__text").text
-    durations = film.find_element(By.CLASS_NAME, "cli-title-metadata-item").text
+    durations = film.find_element(By.CLASS_NAME, "cli-title-metadata").find_elements(By.TAG_NAME, "span")[1].text
     rating = film.find_element(By.CLASS_NAME, "ipc-rating-star--rating").text
     
     poster_img_url = film.find_element(By.CLASS_NAME, "ipc-image").get_attribute("src")
@@ -51,16 +58,21 @@ for film in all_films:
     })
     print(f"{title} - {rating} - {durations} - {film_link}")
 
-
+counter = 0
 for film in films_links:
+    print(f"Getting data for {film['title']}, {counter}")
     driver.get(film["film_link"])
-    film["popularity_rating"] = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, '//*[@data-testid="hero-rating-bar__popularity__score"]'))).text
+    counter += 1
+    try:
+        film["popularity_rating"] = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, '//*[@data-testid="hero-rating-bar__popularity__score"]'))).text
+    except:
+        film["popularity_rating"] = "N/A"
     stars_wrapper = driver.find_elements(By.CLASS_NAME, 'sc-bfec09a1-5')
     film["stars"] = []
     for star in stars_wrapper:
         film["stars"].append({
             "actor_name": star.find_element(By.CLASS_NAME, 'sc-bfec09a1-1').text,
-            "role_name": star.find_element(By.CLASS_NAME, 'title-cast-item__characters-list').text,
+            "role_name": get_role_name(star)
         })
     print(film["popularity_rating"])
     print(film["stars"])
